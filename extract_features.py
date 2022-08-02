@@ -47,17 +47,16 @@ if __name__ == '__main__':
 
     # Read files and extract features
     for fpath in args.files:
-        print('Reading file {}'.format(fpath))
+        print(f'Reading file {fpath}')
         sents = []
         with open(fpath) as f:
             for line in f:
                 line = line.strip()
-                assert line, 'Empty line in {}'.format(fpath)
+                assert line, f'Empty line in {fpath}'
                 sents.append(line)
 
         # Set output file name
-        out_name = os.path.join(
-            args.out_dir, "{}.embs.npy".format(os.path.basename(fpath)))
+        out_name = os.path.join(args.out_dir, f"{os.path.basename(fpath)}.embs.npy")
 
         # Build vocab
         print('Building vocabulary')
@@ -67,5 +66,5 @@ if __name__ == '__main__':
         embs = model.encode(sents, tokenize=args.tokenize,
                             verbose=True, bsize=args.batch_size)
 
-        print('Saving to {}'.format(out_name))
+        print(f'Saving to {out_name}')
         np.save(out_name, embs)

@@ -91,7 +91,7 @@ class InferSent(nn.Module):
     def get_word_dict(self, sentences, tokenize=True):
         # create vocab of words
         word_dict = {}
-        sentences = [s.split() if not tokenize else self.tokenize(s) for s in sentences]
+        sentences = [self.tokenize(s) if tokenize else s.split() for s in sentences]
         for sent in sentences:
             for word in sent:
                 if word not in word_dict:
@@ -109,7 +109,7 @@ class InferSent(nn.Module):
                 word, vec = line.split(' ', 1)
                 if word in word_dict:
                     word_vec[word] = np.fromstring(vec, sep=' ')
-        print('Found %s(/%s) words with w2v vectors' % (len(word_vec), len(word_dict)))
+        print(f'Found {len(word_vec)}(/{len(word_dict)}) words with w2v vectors')
         return word_vec
 
     def get_w2v_k(self, K):
@@ -123,11 +123,10 @@ class InferSent(nn.Module):
                 if k <= K:
                     word_vec[word] = np.fromstring(vec, sep=' ')
                     k += 1
-                if k > K:
-                    if word in [self.bos, self.eos]:
-                        word_vec[word] = np.fromstring(vec, sep=' ')
+                if k > K and word in [self.bos, self.eos]:
+                    word_vec[word] = np.fromstring(vec, sep=' ')
 
-                if k > K and all([w in word_vec for w in [self.bos, self.eos]]):
+                if k > K and all(w in word_vec for w in [self.bos, self.eos]):
                     break
         return word_vec
 
@@ -135,13 +134,13 @@ class InferSent(nn.Module):
         assert hasattr(self, 'w2v_path'), 'w2v path not set'
         word_dict = self.get_word_dict(sentences, tokenize)
         self.word_vec = self.get_w2v(word_dict)
-        print('Vocab size : %s' % (len(self.word_vec)))
+        print(f'Vocab size : {len(self.word_vec)}')
 
     # build w2v vocab with k most frequent words
     def build_vocab_k_words(self, K):
         assert hasattr(self, 'w2v_path'), 'w2v path not set'
         self.word_vec = self.get_w2v_k(K)
-        print('Vocab size : %s' % (K))
+        print(f'Vocab size : {K}')
 
     def update_vocab(self, sentences, tokenize=True):
         assert hasattr(self, 'w2v_path'), 'warning : w2v path not set'
@@ -159,7 +158,9 @@ class InferSent(nn.Module):
             self.word_vec.update(new_word_vec)
         else:
             new_word_vec = []
-        print('New vocab size : %s (added %s words)'% (len(self.word_vec), len(new_word_vec)))
+        print(
+            f'New vocab size : {len(self.word_vec)} (added {len(new_word_vec)} words)'
+        )
 
     def get_batch(self, batch):
         # sent in batch in decreasing order of lengths
@@ -174,16 +175,20 @@ class InferSent(nn.Module):
 
     def tokenize(self, s):
         from nltk.tokenize import word_tokenize
-        if self.moses_tok:
-            s = ' '.join(word_tokenize(s))
-            s = s.replace(" n't ", "n 't ")  # HACK to get ~MOSES tokenization
-            return s.split()
-        else:
+        if not self.moses_tok:
             return word_tokenize(s)
+        s = ' '.join(word_tokenize(s))
+        s = s.replace(" n't ", "n 't ")  # HACK to get ~MOSES tokenization
+        return s.split()
 
     def prepare_samples(self, sentences, bsize, tokenize, verbose):
-        sentences = [[self.bos] + s.split() + [self.eos] if not tokenize else
-                     [self.bos] + self.tokenize(s) + [self.eos] for s in sentences]
+        sentences = [
+            [self.bos] + self.tokenize(s) + [self.eos]
+            if tokenize
+            else [self.bos] + s.split() + [self.eos]
+            for s in sentences
+        ]
+
         n_w = np.sum([len(x) for x in sentences])
 
         # filters words without w2v vectors
@@ -235,10 +240,10 @@ class InferSent(nn.Module):
 
     def visualize(self, sent, tokenize=True):
 
-        sent = sent.split() if not tokenize else self.tokenize(sent)
+        sent = self.tokenize(sent) if tokenize else sent.split()
         sent = [[self.bos] + [word for word in sent if word in self.word_vec] + [self.eos]]
 
-        if ' '.join(sent[0]) == '%s %s' % (self.bos, self.eos):
+        if ' '.join(sent[0]) == f'{self.bos} {self.eos}':
             import warnings
             warnings.warn('No words in "%s" have w2v vectors. Replacing \
                            by "%s %s"..' % (sent, self.bos, self.eos))
